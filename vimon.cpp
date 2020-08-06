@@ -26,17 +26,11 @@
 
 #include "ADS1115.h"
 
+#include "vimon_cal.h"
+
 using namespace std;
 
-#define VOLTAGE_OFFSET 10000.0		// mV
-#define VOLTAGE_MV_PER_MV 2.9296857	// mV
-#define OHM_PER_MV 0.0216748768472
-#define PT100_OFFSET_OHM 90.0		// degC
-#define MA_PER_MV 50				// mA
-
-ADS1115 vimon_adc(ADS1115_ADDRESS_ADDR_SDA);
-
-
+ADS1115 vimon_adc(BOARD_ADDRESS);
 
 bool hardwareSetup () {
 
@@ -86,13 +80,13 @@ void readAllChannels() {
 		printf("%5d ", mVunscaled[i]);
 	}
 
-	voltage_mv = (mVunscaled[0] * VOLTAGE_MV_PER_MV) + VOLTAGE_OFFSET;
+	voltage_mv = (mVunscaled[0] * V1_MV_PER_MV) + V1_OFFSET;
 
-	pt100ohm = (mVunscaled[1] * OHM_PER_MV) + PT100_OFFSET_OHM;
-	pt100temp = (pt100ohm/100.0-1.0)/0.003851;
+	pt100ohm = (mVunscaled[1] * PT_OHM_PER_MV) + PT_OFFSET_OHM;
+	pt100temp = (pt100ohm/PT_REFERENCE_OHM-1.0)/PT_SLOPE;
 
-	current1_ma = mVunscaled[2] * MA_PER_MV;
-	current2_ma = mVunscaled[3] * MA_PER_MV;
+	current1_ma = mVunscaled[2] * I1_MA_PER_MV;
+	current2_ma = mVunscaled[3] * I2_MA_PER_MV;
 
 	printf(" : %5.0f mV", voltage_mv);
 	printf(" : %6.2f Ohm : %5.2f DegC", pt100ohm, pt100temp);

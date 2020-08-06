@@ -35,6 +35,10 @@ $(OBJDIR)/%.o: %.cpp
 	@echo "CXX $<"
 	@$(CXX) $(CFLAGS) -c $< -o $@
 
+$(OBJDIR)/%.o: %.h
+
+$(OBJDIR)/vimon.o: vimon_cal.h
+
 default: $(OBJS)
 	$(CC) $(OBJS) $(LDFLAGS) $(LIBS) -o $(TARGET)
 
