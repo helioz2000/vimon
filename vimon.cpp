@@ -14,153 +14,212 @@
  */
 
 
-#include <errno.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-
-#include <iostream>
-#include <cstring>
-
-#include <wiringPi.h>
 
 #include "ADS1115.h"
 
 #include "vimon_cal.h"
+#include "vimon.h"
 
 using namespace std;
 
-ADS1115 vimon_adc(BOARD_ADDRESS);
 
-bool hardwareSetup () {
+VImon::VImon() {
+	_adc = NULL;
+}
 
-	//wiringPiSetup();
+VImon::~VImon() {
+	if (_adc != NULL)
+		delete _adc;
+}
 
-	//I2Cdev i2c;		// Needed to open I2C bus
+bool VImon::initialize(uint8_t address) {
+	if (_adc != NULL) {
+		return false;		// fail if already initialized (can only initialize once)
+	}
 
-    vimon_adc.initialize();
+	_adc = new ADS1115(address);
+	_adc->initialize();
 
-    if (!vimon_adc.testConnection()) {
-		printf("ADS1115 not found \n");
+	if (!this->testConnection()) {
+		delete _adc;
+		_adc = NULL;
 		return false;
 	}
 
     // set gain
-    vimon_adc.setGain(ADS1115_PGA_2P048);
-	vimon_adc.showConfigRegister();
+    _adc->setGain(ADS1115_PGA_2P048);
 
-	return true;
+    //_adc->showConfigRegister();
+	readRaw();	// read all channels once
 
+    return true;
 }
 
-void readAllChannels() {
+bool VImon::testConnection() {
+	if (!_adc->testConnection()) {
+        perror("ADS1115 not found \n");
+        return false;
+    }
+	return true;
+}
 
-	int rawAnalog[4];
-	int mVunscaled[4];
+void VImon::readRaw() {
+	rawValue[0] = _adc->getConversionP0GND();
+	rawValue[1] = _adc->getConversionP1GND();
+	rawValue[2] = _adc->getConversionP2GND();
+	rawValue[3] = _adc->getConversionP3GND();
+}
+
+int VImon::getUnscaledMilliVolts(int channel, float *value, bool useRaw = 0) {
+	float reading;
+	switch (channel) {
+		case 0:
+			if (useRaw)
+				reading = (float)rawValue[0] * ADS1115_MV_2P048;
+			else
+				reading = (float)_adc->getConversionP0GND() * ADS1115_MV_2P048;
+			break;
+		case 1:
+			if (useRaw)
+				reading = (float)rawValue[1] * ADS1115_MV_2P048;
+			else
+				reading = (float)_adc->getConversionP1GND() * ADS1115_MV_2P048;
+			break;
+		case 2:
+			if (useRaw)
+				reading = (float)rawValue[2] * ADS1115_MV_2P048;
+			else
+				reading = (float)_adc->getConversionP2GND() * ADS1115_MV_2P048;
+			break;
+		case 3:
+			if (useRaw)
+				reading = (float)rawValue[3] * ADS1115_MV_2P048;
+			else
+				reading = (float)_adc->getConversionP3GND() * ADS1115_MV_2P048;
+			break;
+		default:
+			return -1;
+	}
+	*value = reading;
+	return 0;
+}
+
+int VImon::getMilliVolts(int channel, float *value, bool useRaw = 0) {
+	float mVunscaled, mVscaled;
+
+	if (getUnscaledMilliVolts(channel, &mVunscaled, useRaw) < 0) {
+		return -1;
+	}
+
+	switch(channel) {
+		case 0:
+			mVscaled = (mVunscaled * V1_MV_PER_MV) + V1_OFFSET;
+			break;
+		case 1:
+			mVscaled = (mVunscaled * V2_MV_PER_MV) + V2_OFFSET;
+			break;
+		default:
+			return -1;
+	}
+	*value = mVscaled;
+	return 0;
+}
+
+int VImon::getPT100temp(float *value, bool useRaw = 0) {
+	float ohm;
+	if (getPT100ohm(&ohm, useRaw) < 0) {
+		return -1;
+	}
+    *value = (ohm/PT_REFERENCE_OHM-1.0)/PT_SLOPE;
+	return 0;
+}
+
+int VImon::getPT100ohm(float *value, bool useRaw = 0) {
+	float mVunscaled;
+	if (getUnscaledMilliVolts(1, &mVunscaled, useRaw) < 0) {
+		return -1;
+	}
+	*value = (mVunscaled * PT_OHM_PER_MV) + PT_OFFSET_OHM;
+	return 0;
+}
+
+int VImon::getMilliAmps(int channel, float *value, bool useRaw = 0) {
+	float mVunscaled;
+	if (getUnscaledMilliVolts(channel, &mVunscaled, useRaw) < 0) {
+		return -1;
+	}
+	switch (channel) {
+		case 2:
+			*value = mVunscaled * I1_MA_PER_MV;
+			break;
+		case 3:
+			*value = mVunscaled * I2_MA_PER_MV;
+			break;
+		default:
+			return -1;
+	}
+	return 0;
+}
+
+void VImon::readAllChannels(bool useRaw) {
+
+	float mVunscaled;
 	float voltage_mv;
 	float current1_ma, current2_ma;
 	float pt100ohm, pt100temp;
 	int i;
 
-	rawAnalog[0] = vimon_adc.getConversionP0GND();
-	rawAnalog[1] = vimon_adc.getConversionP1GND();
-	rawAnalog[2] = vimon_adc.getConversionP2GND();
-	rawAnalog[3] = vimon_adc.getConversionP3GND();
+	if (useRaw)
+		readRaw();
 
-
-
+	// show raw values
 	for (i=0; i<4; i++) {
-		printf("%5d ",rawAnalog[i]);
+		printf("%5d ",rawValue[i]);
 	}
 
 	printf(" : ");
 
+	// show unscaled mV reading
 	for (i=0; i<4; i++) {
-		mVunscaled[i] = (float)rawAnalog[i] * ADS1115_MV_2P048;
-		printf("%5d ", mVunscaled[i]);
+		if (getUnscaledMilliVolts(i, &mVunscaled, useRaw) == 0) {
+			printf("%5.0f ", mVunscaled);
+		} else {
+			printf("-err- ");
+		}
 	}
 
-	voltage_mv = (mVunscaled[0] * V1_MV_PER_MV) + V1_OFFSET;
+	// show Voltage (CH0)
+	if (getMilliVolts(0, &voltage_mv, useRaw) == 0) {
+		printf(" : %5.0f mV", voltage_mv);
+	} else {
+		printf(" : -err- mV");
+	}
 
-	pt100ohm = (mVunscaled[1] * PT_OHM_PER_MV) + PT_OFFSET_OHM;
-	pt100temp = (pt100ohm/PT_REFERENCE_OHM-1.0)/PT_SLOPE;
+	// show PT100 (CH1)
+	if (getPT100ohm(&pt100ohm, useRaw) == 0) {
+		getPT100temp(&pt100temp, useRaw);
+		printf(" : %6.2f Ohm : %5.2f DegC", pt100ohm, pt100temp);
+	} else {
+		printf(" : -err-  Ohm : -err- DegC");
+	}
 
-	current1_ma = mVunscaled[2] * I1_MA_PER_MV;
-	current2_ma = mVunscaled[3] * I2_MA_PER_MV;
+	// show Current 1 (CH2)
+	if (getMilliAmps(2, &current1_ma, useRaw) == 0) {
+		printf(" : %6.1f mA", current1_ma);
+	} else {
+		printf(" : -err-  mA");
+	}
 
-	printf(" : %5.0f mV", voltage_mv);
-	printf(" : %6.2f Ohm : %5.2f DegC", pt100ohm, pt100temp);
-	printf(" : %6.1f mA : %6.1f mA", current1_ma, current2_ma);
+	// show Current 2 (CH3)
+	if (getMilliAmps(3, &current2_ma, useRaw) == 0) {
+		printf(" : %6.1f mA", current2_ma);
+	} else {
+		printf(" : -err-  mA");
+	}
 
 	printf("\n");
 
 }
 
-void mainLoop() {
-	while(1) {
-		readAllChannels();
-		usleep(1000000);		//micro seconds
-	}
-}
-
-static void showUsage(void) {
-    cout << "usage:" << endl;
-    cout << "-cCfgFileName -d -h" << endl;
-    cout << "c = name of config file" << endl;
-    cout << "d = deamon mode" << endl;
-    cout << "h = show help" << endl;
-}
-
-static bool parseArguments (int argc, char *argv[])
-{
-    char buffer[64];
-    int i, buflen;
-    int retval = true;
-
-    if (argc > 1) {
-        for (i = 1; i < argc; i++) {
-            strcpy(buffer, argv[i]);
-            buflen = strlen(buffer);
-            if ((buffer[0] == '-') && (buflen >=2)) {
-                switch (buffer[1]) {
-                    case 'c':
-                        //cfgFileName = std::string(&buffer[2]);
-                        break;
-                    case 'd':
-                        //runAsDaemon = true;
-                        break;
-                    case 'h':
-                        showUsage();
-                        retval = false;
-                        break;
-                    default:
-                        std::cerr << "uknown parameter <" << &buffer[1] << ">" << endl;
-                        showUsage();
-                        retval = false;
-                        break;
-                }
-                ;
-            }
-        }
-    }
-    return retval;
-}
-
-int main (int argc, char *argv[])
-{
-    if (! parseArguments(argc, argv) ){
-		goto exit_fail;
-	}
-
-	if (!hardwareSetup()) {
-		goto exit_fail;
-	}
-
-	mainLoop();
-
-	exit(EXIT_SUCCESS);
-
-exit_fail:
-	exit(EXIT_FAILURE);
-	return 0;
-}

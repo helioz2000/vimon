@@ -1,4 +1,4 @@
-TARGET = vimon
+TARGET = vimontest
 
 # - Compiler
 CC=gcc
