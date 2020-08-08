@@ -26,10 +26,14 @@
 #define V2_MV_PER_MV 2.9296857	// mV
 
 // Temperature measurement CH 2
+// Resistance calibration
 #define PT_OHM_PER_MV 0.034791252485
 #define PT_OFFSET_OHM 86.2		// Ohm
+
+// Ohm to PT100 temp conversion
 #define PT_REFERENCE_OHM 100.0	// Ohm (100 for PT100)
 #define PT_SLOPE 0.003851		// PT slope factor
+#define PT_OFFSET_TEMP -1.8		// Compensation for low quality PT100
 
 // Current measurement CH 3
 #define I1_MA_PER_MV 50		// mA

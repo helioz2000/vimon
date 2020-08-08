@@ -72,7 +72,28 @@ void VImon::readRaw() {
 	rawValue[3] = _adc->getConversionP3GND();
 }
 
-int VImon::getUnscaledMilliVolts(int channel, float *value, bool useRaw = 0) {
+int VImon::getRawValue(int channel, int16_t *value) {
+	switch (channel) {
+		case 0:
+			*value = _adc->getConversionP0GND();
+			break;
+		case 1:
+			*value = _adc->getConversionP1GND();
+			break;
+		case 2:
+			*value = _adc->getConversionP2GND();
+			break;
+		case 3:
+			*value = _adc->getConversionP3GND();
+			break;
+		default:
+			return -1;
+	}
+	return 0;
+
+}
+
+int VImon::getUnscaledMilliVolts(int channel, float *value, bool useRaw) {
 	float reading;
 	switch (channel) {
 		case 0:
@@ -106,7 +127,7 @@ int VImon::getUnscaledMilliVolts(int channel, float *value, bool useRaw = 0) {
 	return 0;
 }
 
-int VImon::getMilliVolts(int channel, float *value, bool useRaw = 0) {
+int VImon::getMilliVolts(int channel, float *value, bool useRaw) {
 	float mVunscaled, mVscaled;
 
 	if (getUnscaledMilliVolts(channel, &mVunscaled, useRaw) < 0) {
@@ -127,16 +148,17 @@ int VImon::getMilliVolts(int channel, float *value, bool useRaw = 0) {
 	return 0;
 }
 
-int VImon::getPT100temp(float *value, bool useRaw = 0) {
+int VImon::getPT100temp(float *value, bool useRaw) {
 	float ohm;
 	if (getPT100ohm(&ohm, useRaw) < 0) {
 		return -1;
 	}
     *value = (ohm/PT_REFERENCE_OHM-1.0)/PT_SLOPE;
+	*value += (float)PT_OFFSET_TEMP;
 	return 0;
 }
 
-int VImon::getPT100ohm(float *value, bool useRaw = 0) {
+int VImon::getPT100ohm(float *value, bool useRaw) {
 	float mVunscaled;
 	if (getUnscaledMilliVolts(1, &mVunscaled, useRaw) < 0) {
 		return -1;
@@ -145,7 +167,7 @@ int VImon::getPT100ohm(float *value, bool useRaw = 0) {
 	return 0;
 }
 
-int VImon::getMilliAmps(int channel, float *value, bool useRaw = 0) {
+int VImon::getMilliAmps(int channel, float *value, bool useRaw) {
 	float mVunscaled;
 	if (getUnscaledMilliVolts(channel, &mVunscaled, useRaw) < 0) {
 		return -1;
@@ -163,63 +185,68 @@ int VImon::getMilliAmps(int channel, float *value, bool useRaw = 0) {
 	return 0;
 }
 
-void VImon::readAllChannels(bool useRaw) {
-
+void VImon::readAllChannels(std::string& retStr, bool useRaw) {
 	float mVunscaled;
 	float voltage_mv;
 	float current1_ma, current2_ma;
 	float pt100ohm, pt100temp;
 	int i;
+	char buf[64];
 
 	if (useRaw)
 		readRaw();
 
+	retStr = "";
 	// show raw values
 	for (i=0; i<4; i++) {
-		printf("%5d ",rawValue[i]);
+		sprintf(buf, "%5d ",rawValue[i]);
+		retStr += buf;
 	}
 
-	printf(" : ");
+	//printf(" : ");
+	retStr += " : ";
 
 	// show unscaled mV reading
 	for (i=0; i<4; i++) {
 		if (getUnscaledMilliVolts(i, &mVunscaled, useRaw) == 0) {
-			printf("%5.0f ", mVunscaled);
+			sprintf(buf, "%5.0f ", mVunscaled);
 		} else {
-			printf("-err- ");
+			sprintf(buf, "-err- ");
 		}
+		retStr += buf;
 	}
 
 	// show Voltage (CH0)
 	if (getMilliVolts(0, &voltage_mv, useRaw) == 0) {
-		printf(" : %5.0f mV", voltage_mv);
+		sprintf(buf, " : %5.0f mV", voltage_mv);
 	} else {
-		printf(" : -err- mV");
+		sprintf(buf, " : -err- mV");
 	}
+	retStr += buf;
 
 	// show PT100 (CH1)
 	if (getPT100ohm(&pt100ohm, useRaw) == 0) {
 		getPT100temp(&pt100temp, useRaw);
-		printf(" : %6.2f Ohm : %5.2f DegC", pt100ohm, pt100temp);
+		sprintf(buf, " : %6.2f Ohm : %5.2f DegC", pt100ohm, pt100temp);
 	} else {
-		printf(" : -err-  Ohm : -err- DegC");
+		sprintf(buf, " : -err-  Ohm : -err- DegC");
 	}
+	retStr += buf;
 
 	// show Current 1 (CH2)
 	if (getMilliAmps(2, &current1_ma, useRaw) == 0) {
-		printf(" : %6.1f mA", current1_ma);
+		sprintf(buf, " : %6.1f mA", current1_ma);
 	} else {
-		printf(" : -err-  mA");
+		sprintf(buf, " : -err-  mA");
 	}
+	retStr += buf;
 
 	// show Current 2 (CH3)
 	if (getMilliAmps(3, &current2_ma, useRaw) == 0) {
-		printf(" : %6.1f mA", current2_ma);
+		sprintf(buf, " : %6.1f mA", current2_ma);
 	} else {
-		printf(" : -err-  mA");
+		sprintf(buf, " : -err-  mA");
 	}
-
-	printf("\n");
+	retStr += buf;
 
 }
-

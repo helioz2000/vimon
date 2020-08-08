@@ -23,6 +23,8 @@
 #define _VIMON_H_
 
 #include <unistd.h>
+#include <string>
+
 #include "ADS1115.h"
 
 class VImon {
@@ -43,7 +45,7 @@ public:
  using this function can avoind rapid subsequent reading from
  the ADC. All 4 channels are read and the results ares stored
  in "rawValue[4]" (public).
- The "get...." functions can optinally use the raw values.
+ The "get...." functions can optinally use the raw values or perform teir own read
  - usecs specifies the delay between readings
  */
 	void readRaw();
@@ -58,17 +60,18 @@ public:
    of the ADC channels which can cause small reading variations
    due to rapid MUX switching.
 */
-	int getUnscaledMilliVolts(int channel, float *value, bool useRaw);
-	int getMilliVolts(int channel, float *value, bool useRaw);
-	int getMilliAmps(int channel, float *value, bool useRaw);
+	int getRawValue(int channel, int16_t *value);
+	int getUnscaledMilliVolts(int channel, float *value, bool useRaw =0);
+	int getMilliVolts(int channel, float *value, bool useRaw =0);
+	int getMilliAmps(int channel, float *value, bool useRaw =0);
 
 /*
  PT100 is optional and replaces Voltage 2
  - connected on CH 1
  */
-	int getPT100ohm(float* value, bool useRaw);
-	int getPT100temp(float *value, bool useRaw);
-	int getTemperature(float *value, bool useRaw);
+	int getPT100ohm(float* value, bool useRaw =0);
+	int getPT100temp(float *value, bool useRaw =0);
+	int getTemperature(float *value, bool useRaw =0);
 
 /*
  returns true when the ADS1115 is present on the I2C bus
@@ -80,7 +83,7 @@ public:
  - useRaw will give a consistent reading as displayed
    details come from a single reading.
  */
-	void readAllChannels(bool useRaw);
+	void readAllChannels(std::string& retStr, bool useRaw =0);
 
 /*
  storage for raw readings
