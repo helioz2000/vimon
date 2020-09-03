@@ -225,7 +225,7 @@ void VImon::readAllChannels(std::string& retStr, bool useRaw) {
 	// show unscaled mV reading
 	for (i=0; i<4; i++) {
 		if (getUnscaledMilliVolts(i, &mVunscaled, useRaw) == 0) {
-			sprintf(buf, "%5.0f ", mVunscaled);
+			sprintf(buf, "%5.1f ", mVunscaled);
 		} else {
 			sprintf(buf, "-err- ");
 		}
@@ -234,20 +234,30 @@ void VImon::readAllChannels(std::string& retStr, bool useRaw) {
 
 	// show Voltage (CH0)
 	if (getMilliVolts(0, &voltage_mv, useRaw) == 0) {
-		sprintf(buf, " : %5.0f mV", voltage_mv);
+		sprintf(buf, " : %5.1f mV", voltage_mv);
+	} else {
+		sprintf(buf, " : -err- mV");
+	}
+	retStr += buf;
+
+	// show Voltage (CH1)
+	if (getMilliVolts(1, &voltage_mv, useRaw) == 0) {
+		sprintf(buf, " : %5.1f mV", voltage_mv);
 	} else {
 		sprintf(buf, " : -err- mV");
 	}
 	retStr += buf;
 
 	// show PT100 (CH1)
-	if (getPT100ohm(&pt100ohm, useRaw) == 0) {
+/*	if (getPT100ohm(&pt100ohm, useRaw) == 0) {
 		getPT100temp(&pt100temp, useRaw);
 		sprintf(buf, " : %6.2f Ohm : %5.2f DegC", pt100ohm, pt100temp);
 	} else {
 		sprintf(buf, " : -err-  Ohm : -err- DegC");
 	}
 	retStr += buf;
+*/
+
 
 	// show Current 1 (CH2)
 	if (getMilliAmps(2, &current1_ma, useRaw) == 0) {
