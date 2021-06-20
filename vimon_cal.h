@@ -35,10 +35,17 @@
 #define PT_SLOPE 0.003851		// PT slope factor
 #define PT_OFFSET_TEMP -1.8		// Compensation for low quality PT100
 
+// Current measurement Details
+// INA180A1 provides voltage gain of 20, between input terminals and ADC
+// example: shunt 50mV/500A, 50mV * 20 = 1000mV @ ADC
+//          500000mA/1000mV = 500mA/mV @ ADC
+// simplified: for a 50mV/xxA shunt the value is xx mV/mV @ ADC
+//             for a 100mV/xxA shunt the value is xx/2 mV/mA @ ADC
+
 // Current measurement CH 3
-#define I1_MA_PER_MV 50		// mA
+#define I1_MA_PER_MV 50		// mA/mV @ADC
 
 // Current measurement CH 4
-#define I2_MA_PER_MV 50		// mA
+#define I2_MA_PER_MV 50		// mA/mV @ADC
 
 #endif	// VIMON_CAL_H
